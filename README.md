@@ -1,1 +1,1 @@
-Boilerplate for performance testing using gatling-scala
+A boilerplate framework that helps you to write performance tests for E2E API using Gatling Scala
