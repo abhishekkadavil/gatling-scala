@@ -11,8 +11,8 @@
     <maven.compiler.target>1.8</maven.compiler.target>
     <encoding>UTF-8</encoding>
 
-    <gatling.version>3.6.1</gatling.version>
-    <gatling-maven-plugin.version>3.1.2</gatling-maven-plugin.version>
+    <gatling.version>3.14.0</gatling.version>
+    <gatling-maven-plugin.version>4.20.0</gatling-maven-plugin.version>
   </properties>
 
 <!--  Auto generated when we select the archetype while creating new proj-->
@@ -29,7 +29,7 @@
     </dependency>
     <dependency>
       <groupId>io.gatling</groupId>
-      <artifactId>gatling-recorder</artifactId>
+      <artifactId>gatling-core</artifactId>
       <version>${gatling.version}</version>
     </dependency>
   </dependencies>
@@ -37,6 +37,20 @@
   <build>
     <testSourceDirectory>src/test/scala</testSourceDirectory>
     <plugins>
+      <plugin>
+        <groupId>net.alchim31.maven</groupId>
+        <artifactId>scala-maven-plugin</artifactId>
+        <version>4.7.1</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>compile</goal>
+              <goal>testCompile</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
       <plugin>
         <groupId>io.gatling</groupId>
         <artifactId>gatling-maven-plugin</artifactId>
