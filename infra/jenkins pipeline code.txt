@@ -1,0 +1,86 @@
+pipeline {
+    agent { label 'local-agent' }
+
+    parameters {
+        string(name: 'INSTANCE_COUNT', defaultValue: '2', description: 'Number of EC2 instances to launch')
+        string(name: 'SIMULATION_CLASS', defaultValue: 'simulations.TestGetAPISimulations', description: 'Fully qualified Gatling simulation class')
+    }
+
+    environment {
+        AWS_DEFAULT_REGION = 'ap-south-1'
+        PEM_FILE = '/home/abhishek/jenkins-agent/jenkins-perf-key.pem'
+        GATLING_REPO = 'https://github.com/abhishekkadavil/gatling-scala'
+    }
+
+    stages {
+        stage('Launch EC2 Instances') {
+            steps {
+                withAWS(credentials: 'AWS-Creds', region: "${env.AWS_DEFAULT_REGION}") {
+                    script {
+                        def count = params.INSTANCE_COUNT.toInteger()
+                        def instanceIds = sh(script: """aws ec2 run-instances \
+                            --image-id ami-0f58b397bc5c1f2e8 \
+                            --count ${count} \
+                            --instance-type t3.micro \
+                            --key-name jenkins-perf-key \
+                            --security-groups default \
+                            --region ${env.AWS_DEFAULT_REGION} \
+                            --tag-specifications 'ResourceType=instance,Tags=[{Key=CreatedBy,Value=JenkinsGatling}]' \
+                            --query 'Instances[*].InstanceId' --output text""", returnStdout: true).trim()
+
+                        echo "Launched EC2 Instances: ${instanceIds}"
+                        sh "aws ec2 wait instance-running --instance-ids ${instanceIds} --region ${env.AWS_DEFAULT_REGION}"
+                    }
+                }
+            }
+        }
+
+        stage('Run Gatling Tests in Parallel') {
+            steps {
+                withAWS(credentials: 'AWS-Creds', region: "${env.AWS_DEFAULT_REGION}") {
+                    script {
+                        def INSTANCE_IPS = sh(script: """aws ec2 describe-instances \
+                            --filters "Name=tag:CreatedBy,Values=JenkinsGatling" "Name=instance-state-name,Values=running" \
+                            --query "Reservations[*].Instances[*].PublicIpAddress" \
+                            --output text --region ${env.AWS_DEFAULT_REGION}""", returnStdout: true).trim().split()
+
+                        env.WORKER_IPS = INSTANCE_IPS.join(',')
+                        echo "Running Gatling on instances in parallel: ${INSTANCE_IPS}"
+
+                        def branches = INSTANCE_IPS.collectEntries { ip ->
+                            ["${ip}": {
+                                echo "🚀 Starting Gatling on ${ip}"
+                                sh '''
+                                    ssh -o StrictHostKeyChecking=no -i ${PEM_FILE} ubuntu@''' + ip + ''' "bash -c '
+                                        sudo apt update -y && sudo apt install -y openjdk-11-jdk maven git zip;
+                                        cd /home/ubuntu;
+                                        if [ ! -d \"gatling-scala\" ]; then git clone ''' + GATLING_REPO + '''; fi;
+                                        cd gatling-scala && git pull;
+                                        mvn gatling:test -Dgatling.simulationClass=''' + params.SIMULATION_CLASS + ''';
+                                    '"
+                                '''
+                            }]
+                        }
+
+                        parallel branches
+                    }
+                }
+            }
+        }
+
+    }
+
+    post {
+        always {
+            echo "Cleaning up EC2 instances"
+            withAWS(credentials: 'AWS-Creds', region: "${env.AWS_DEFAULT_REGION}") {
+                sh '''
+                    INSTANCE_IDS=$(aws ec2 describe-instances \
+                        --filters "Name=tag:CreatedBy,Values=JenkinsGatling" "Name=instance-state-name,Values=running" \
+                        --query "Reservations[*].Instances[*].InstanceId" --output text)
+                    [ -n "$INSTANCE_IDS" ] && aws ec2 terminate-instances --instance-ids $INSTANCE_IDS
+                '''
+            }
+        }
+    }
+}
