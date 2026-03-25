@@ -1,3 +1,4 @@
+# Overview
 A boilerplate framework that helps you to write performance tests for E2E API using Gatling Scala
 
 # Why/Why not
@@ -5,8 +6,6 @@ A boilerplate framework that helps you to write performance tests for E2E API us
   Fargate is ideal for stateless, containerized microservices, not coordinated test runners. ECS on EC2 provides more control over the environment, making it suitable for performance testing scenarios that require specific configurations and resource management.
 * why not use gatling to combine results of multiple simulations:  
   Gatling's built-in result combination is limited and may not handle complex scenarios well. Using external tools like Grafana and InfluxDB provides more flexibility and better visualization options for analyzing performance test results. Earlier gatling versions were supporting this feature but in latest versions this feature is removed.
-* InfluxDB3:  
-Given your requirements for a cost-effective and production-grade solution for Gatling distributed load testing report generation, InfluxDB 3 Core appears to be a suitable choice. Its high write throughput, efficient storage compression, and fast query performance align well with the demands of load testing scenarios.However, it's important to note that InfluxDB 3 Core is designed for single-node deployments and may not be ideal for scenarios requiring high availability or long-term data retention. If your use case involves such requirements, you might consider exploring InfluxDB 3 Enterprise or other TSDBs that offer these capabilities.
 
 # Execute test
 ## From local machine
@@ -37,38 +36,8 @@ execute test: mvn gatling:test -Dgatling.simulationClass=simulations.TestChainin
      │ - Runs actual test │   │ - Runs actual test │   │ - Runs actual test │
      └────────────────────┘   └────────────────────┘   └────────────────────┘
 
-After the execution we can use InfluxDB and Grafana to visualize the results.
-
+After the execution we can terminate EC2s, Previously we used gatling to merge the report but in latest gatling that feature is removed. Anyway, usually we use tools like datadog to see the realtime performance of APIs. Same tool we can use to debug the issues as well.
 # Infra architecture - After test execution
-    +----------------+             +-----------------+
-    | Gatling EC2 #1 |  --->       |                 |
-    | Gatling EC2 #2 |  --->       |  InfluxDB 1.8   |
-    | Gatling EC2 #3 |  --->       |                 |
-    +----------------+             +-----------------+
-                                            |
-                                            v
-                                      +-------------+
-                                      |   Grafana   |
-                                      | Dashboards  |
-                                      +-------------+
-
-
-    [ Gatling EC2 ]  --->  [ Temporary EC2: InfluxDB + Grafana ]
-        |                     |
-        | (sends metrics)     |
-        |-------------------->|
-        |  run test           |
-        |                     |
-        |<----view results----|
-terminate EC2s when done
-
-
-# InfluxDB and Grafana Setup
-* Setup InfluxDB 1.8 in local using docker
-* Setup Grafana in local using docker
-  * Configure InfluxDB datasource in grafana
-
-
 # AWS Setup
 Create AWS account
 * First create account in AWS(root user)
@@ -89,7 +58,7 @@ jenkins used from local using docker.
 * HTML Publisher - to publish html reports
 * Amazon EC2 - to manage EC2 instances from jenkins
 
-Jenkins node setup:  
+## Jenkins node setup:  
 Instead of stuffing everything into Jenkins, people usually:
 * Run Jenkins as the controller (UI + scheduling).
 * Let jobs run on separate agents (containers or EC2s) that already have AWS CLI (or Gatling, Terraform, etc.) installed.
@@ -100,7 +69,7 @@ That way:
 
 To summarize, Jenkins controller is the brain, and agents are the workers. To implement this jenkins need node to execute the pipeline code, so I am using local machine as node, usually in prod it can be EC2 instance or any other server or containers.
 
-Setup local machine as jenkins node:
+## Setup local machine as jenkins node:
 
 Prerequisites:
 * Install java in local machine
